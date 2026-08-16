@@ -28,9 +28,7 @@ def main():
         f"{q_basal_l:.2f} mU"
     )
 
-    def test_for_zero_infusion(min_time: float) -> float:
-            return 0.0
-    
+    #test for increased insulin infusion
     def increased_insulin_infusion(min_time: float) -> float:
 
         if 100 <= min_time < 200:
@@ -38,15 +36,31 @@ def main():
 
         return r_basal
 
-    print(f"Infusion at 0 min: {increased_insulin_infusion(0):.6f} mU/min")
-    print(f"Infusion at 100 min: {increased_insulin_infusion(100):.6f} mU/min")
-    print(f"Infusion at 150 min: {increased_insulin_infusion(150):.6f} mU/min")
-    print(f"Infusion at 200 min: {increased_insulin_infusion(200):.6f} mU/min")
+    #test for reduced insulin infusion
+    def reduced_insulin_infusion(min_time: float) -> float:
+
+         if 100 <= min_time < 200:
+              return 0.5 * r_basal
+
+         return r_basal
+
+    #test for no insulin infusion
+    def no_insulin_infusion(min_time: float) -> float:
+
+         if 100 <= min_time < 200:
+              return 0.0
+
+         return r_basal
+
+    print(f"Infusion at 0 min: {no_insulin_infusion(0):.6f} mU/min")
+    print(f"Infusion at 100 min: {no_insulin_infusion(100):.6f} mU/min")
+    print(f"Infusion at 150 min: {no_insulin_infusion(150):.6f} mU/min")
+    print(f"Infusion at 200 min: {no_insulin_infusion(200):.6f} mU/min")
 
     #Perform simulation:
 
     soln = perform_insulin_sim(
-        compartment_infusion_function = increased_insulin_infusion,
+        compartment_infusion_function = no_insulin_infusion,
         min_duration = 600.0,
         output_interval_min = 1.0,
     )
