@@ -11,6 +11,9 @@ from scipy.integrate import solve_ivp
 #for a type 1 diabetic patient, i.e. they do not produce any endogenous
 #insulin and therefore, basal insulin concentrations are set to zero
 
+#I_L = liver insulin
+#I_P = plasma insulin
+
 def insulin_derivatives( #Paper's model 4 equations:
         min_time, compartment, parameters, R_aIP, 
 ):
@@ -56,3 +59,8 @@ def perform_insulin_sim( #Solve model 4's equations over time
 
 def test_for_insulin_delivery(min_time): #Creates a controlled test for the insulin pump
     return 1.0
+
+def basal_insulin_delivery(min_time: float) -> float:
+    #the basal insulin delivery from the pump
+    basal_rate = 0.1
+    return basal_rate
