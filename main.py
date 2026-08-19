@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
 
 from insulin_new import (
     basal_insulin_p,
@@ -6,12 +7,21 @@ from insulin_new import (
     q_basal_p,
     r_basal,
     perform_insulin_sim,
-    basal_insulin_infusion,
     plasma_insulin_concentration,
+)
+
+from glucose import(
+     perform_glucose_sim,
+     plasma_glucose_conc,
+     constant_basal_insulin,
+     zero_glucose_appearance,
+
 )
 
 
 def main():
+
+    print("=== INTRAPERITONEAL INSULIN & GLUCOSE SIMULATION ===")
 
     print(
         f"Basal plasma insulin concentration: "
@@ -28,170 +38,90 @@ def main():
         f"{q_basal_l:.2f} mU"
     )
 
-    #test for increased insulin infusion
-    def increased_insulin_infusion(min_time: float) -> float:
+    print(f"Basal continuous infusion: {r_basal:.4f} mU/min\n")
+
+
+    #tests:
+    def test_insulin_infusion(min_time: float) -> float:
 
         if 100 <= min_time < 200:
-            return 2.0 * r_basal
+            return 0.0
 
         return r_basal
 
-    #test for reduced insulin infusion
-    def reduced_insulin_infusion(min_time: float) -> float:
-
-         if 100 <= min_time < 200:
-              return 0.5 * r_basal
-
-         return r_basal
-
-    #test for no insulin infusion
-    def no_insulin_infusion(min_time: float) -> float:
-
-         if 100 <= min_time < 200:
-              return 0.0
-
-         return r_basal
-
-    print(f"Infusion at 0 min: {no_insulin_infusion(0):.6f} mU/min")
-    print(f"Infusion at 100 min: {no_insulin_infusion(100):.6f} mU/min")
-    print(f"Infusion at 150 min: {no_insulin_infusion(150):.6f} mU/min")
-    print(f"Infusion at 200 min: {no_insulin_infusion(200):.6f} mU/min")
-
-    #Perform simulation:
-
-    soln = perform_insulin_sim(
-        compartment_infusion_function = no_insulin_infusion,
-        min_duration = 600.0,
-        output_interval_min = 1.0,
+    # 1. Run IP Insulin Simulation
+    duration = 600.0
+    soln_insulin = perform_insulin_sim(
+        compartment_infusion_function=test_insulin_infusion,
+        min_duration=duration,
+        output_interval_min=1.0,
     )
 
+    time_insulin = soln_insulin.t
+    q_ip1 = soln_insulin.y[0]
+    q_ip2 = soln_insulin.y[1]
+    q_liver = soln_insulin.y[2]
+    plasma_mass = soln_insulin.y[3]
+    plasma_conc = plasma_insulin_concentration(plasma_mass)
 
-    #Get results:
-    time = soln.t
-
-    q_ip1 = soln.y[0]
-    q_ip2 = soln.y[1]
-    q_liver = soln.y[2]
-    plasma_mass = soln.y[3]
-
-    print()
-    print("IP compartment 1:")
-    print(f"0 min:   {q_ip1[0]:.4f} mU")
-    print(f"100 min: {q_ip1[100]:.4f} mU")
-    print(f"150 min: {q_ip1[150]:.4f} mU")
-    print(f"200 min: {q_ip1[200]:.4f} mU")
-    print(f"300 min: {q_ip1[300]:.4f} mU")
-
-    print()
-    print("IP compartment 2:")
-    print(f"0 min:   {q_ip2[0]:.4f} mU")
-    print(f"100 min: {q_ip2[100]:.4f} mU")
-    print(f"150 min: {q_ip2[150]:.4f} mU")
-    print(f"200 min: {q_ip2[200]:.4f} mU")
-    print(f"300 min: {q_ip2[300]:.4f} mU")
-
-
-    # Convert plasma insulin mass to concentration
-
-    plasma_concentration = plasma_insulin_concentration(
-        soln.y[3]
+    # 2. Couple Insulin output to Glucose Simulation
+    insulin_interpolator = interp1d(
+        time_insulin,
+        plasma_conc,
+        kind="linear",
+        fill_value="extrapolate",
     )
 
-
-    print()
-    print(f"Plasma insulin at 0 min: {plasma_concentration[0]:.4f} mU/L")
-    print(f"Plasma insulin at 100 min: {plasma_concentration[100]:.4f} mU/L")
-    print(f"Plasma insulin at 150 min: {plasma_concentration[150]:.4f} mU/L")
-    print(f"Plasma insulin at 200 min: {plasma_concentration[200]:.4f} mU/L")
-    print(f"Plasma insulin at 300 min: {plasma_concentration[300]:.4f} mU/L")
-    print(f"Plasma insulin at 600 min: {plasma_concentration[600]:.4f} mU/L")
-
-
-    #Output results
-
-    print()
-
-    print(
-        f"Initial plasma insulin: "
-        f"{plasma_concentration[0]:.12f} mU/L"
+    soln_glucose = perform_glucose_sim(
+        insulin_function=lambda t: float(insulin_interpolator(t)),
+        glucose_appearance_function=zero_glucose_appearance,
+        min_duration=duration,
+        output_interval_min=1.0,
     )
 
-    print(
-        f"Final plasma insulin: "
-        f"{plasma_concentration[-1]:.12f} mU/L"
-    )
+    time_glucose = soln_glucose.t
+    glucose_mg_dl = plasma_glucose_conc(soln_glucose.y[0])
 
-    print(
-        f"Initial liver insulin: "
-        f"{q_liver[0]:.12f} mU"
-    )
+    print("=== SIMULATION RESULTS ===")
+    print(f"Glucose at 0 min:   {glucose_mg_dl[0]:.2f} mg/dL")
+    print(f"Glucose at 100 min: {glucose_mg_dl[100]:.2f} mg/dL")
+    print(f"Glucose at 200 min: {glucose_mg_dl[200]:.2f} mg/dL (after pause)")
+    print(f"Glucose at 600 min: {glucose_mg_dl[-1]:.2f} mg/dL (recovered)")
 
-    print(
-        f"Final liver insulin: "
-        f"{q_liver[-1]:.12f} mU"
-    )
+    # 3. Plotting
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
 
+    # Subplot 1: IP Compartment Masses
+    axs[0].plot(time_insulin, q_ip1, label="IP Comp 1 (mU)")
+    axs[0].plot(time_insulin, q_ip2, label="IP Comp 2 (mU)")
+    axs[0].plot(time_insulin, q_liver, label="Liver Insulin (mU)")
+    axs[0].plot(time_insulin, plasma_mass, label="Plasma Insulin Mass (mU)")
+    axs[0].set_ylabel("Insulin Mass (mU)")
+    axs[0].set_title("Intraperitoneal Insulin Compartments")
+    axs[0].grid(True)
+    axs[0].legend()
 
-    #Plot insulin compartments
+    # Subplot 2: Plasma Insulin Concentration
+    axs[1].plot(time_insulin, plasma_conc, color="tab:orange", label="Plasma [Insulin]")
+    axs[1].set_ylabel("Insulin (mU/L)")
+    axs[1].set_title("Plasma Insulin Concentration")
+    axs[1].grid(True)
+    axs[1].legend()
 
-    plt.figure(figsize=(9, 5))
+    # Subplot 3: Plasma Glucose Response
+    axs[2].plot(time_glucose, glucose_mg_dl, color="tab:red", label="Blood Glucose (mg/dL)")
+    axs[2].axhline(y=110.0, color="gray", linestyle="--", label="Target Basal (110 mg/dL)")
+    axs[2].set_xlabel("Time (min)")
+    axs[2].set_ylabel("Glucose (mg/dL)")
+    axs[2].set_title("Blood Glucose Response")
+    axs[2].grid(True)
+    axs[2].legend()
 
-    plt.plot(
-        time,
-        q_ip1,
-        label="IP compartment 1",
-    )
-
-    plt.plot(
-        time,
-        q_ip2,
-        label="IP compartment 2",
-    )
-
-    plt.plot(
-        time,
-        q_liver,
-        label="Liver insulin",
-    )
-
-    plt.plot(
-        time,
-        plasma_mass,
-        label="Plasma insulin",
-    )
-
-    plt.xlabel("Time (min)")
-    plt.ylabel("Insulin mass (mU)")
-    plt.title("Intraperitoneal Insulin Model")
-
-    plt.legend()
-    plt.grid(True)
     plt.tight_layout()
-
     plt.show()
 
-
-    #Plot [plasma insulin]
-
-    plt.figure(figsize=(9, 5))
-
-    plt.plot(
-        time,
-        plasma_concentration,
-        label="Plasma insulin concentration",
-    )
-
-    plt.xlabel("Time (min)")
-    plt.ylabel("Plasma insulin (mU/L)")
-    plt.title("Plasma Insulin Concentration")
-
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-
-    plt.show()
-
-
+def test_for_basal_only(min_time: float) -> float:
+    return r_basal
 
 if __name__ == "__main__":
     main()

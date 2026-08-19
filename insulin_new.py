@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 
-#Using the intraperiotoneal insulin delivery model 
+#Using the intraperitoneal insulin delivery model 
 #from url: https://pmc.ncbi.nlm.nih.gov/articles/PMC8465342/?utm_source=chatgpt.com#B13-metabolites-11-00600
 #from Schiavon et al.
 
