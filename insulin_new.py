@@ -7,12 +7,12 @@ from scipy.integrate import solve_ivp
 
 #The following are parameters from the above paper:
 
-k_a1 = 0.010 #first IP compartment
-k_a2 = 0.028 #second IP compartment 
+k_a1 = 0.010 #1/min: first IP compartment
+k_a2 = 0.028 #1/min: second IP compartment 
 
-v_i = 3.4 #volume of insulin distribution
+v_i = 3.4 #L; volume of insulin distribution
 m_1 = 0.15 #constant rate of insulin distribution from liver -> plasma
-m_2 = 0.268 #volume of insulin distribution 
+m_2 = 0.268 #1/min: rate of insulin transfer from plasma -> liver 
 
 cl = 1.16 #post-hepatic insulin clearance
 He_b = 0.59 #basal hepatic insulin extraction
@@ -66,19 +66,19 @@ def basal_insulin_infusion(min_time : float) -> float:
 
 def derivatives(min_time : float, 
                 compartment : np.ndarray, 
-                infusion_func,) -> np.ndarray:
+                u_ip,) -> np.ndarray:
 
     Q_ip1, Q_ip2, q_l, q_p = compartment
 
     #insulin entering first IP compartment
-    infusion_rate = infusion_func(min_time)
+    infusion_rate = u_ip(min_time)
 
     #IP insulin absorption model 
-    dq_ip1_dt = (-(k_a1 + k_a2) * Q_ip1 + infusion_rate)
+    dq_ip1_dt = (-(k_a2 + k_a1) * Q_ip1 + infusion_rate)
 
     dq_ip2_dt = (-k_a2 * Q_ip2 + k_a2 * Q_ip1)
     
-    #Insulin: IP -> Liver
+    #Insulin: insulin absorption rate from IP -> Liver
     R_ai = (k_a1 * Q_ip1 + k_a2 * Q_ip2)
 
     #liver degradation:
@@ -86,7 +86,7 @@ def derivatives(min_time : float,
 
     #liver + plasma insulin
 
-    dq_l_dt = (-(m_1 + m_3) * q_l + m_2 * q_p + R_ai)
+    dq_l_dt = (-(m_1 + m_3) * q_l + m_2 * q_p + R_ai) #insulin modelled as entering liver 
     dq_p_dt = (-(m_2 + m_4) * q_p + m_1 * q_l)
 
     return np.array([dq_ip1_dt, dq_ip2_dt, dq_l_dt, dq_p_dt], 
@@ -109,7 +109,7 @@ def perform_insulin_sim(
     )
 
     soln = solve_ivp(
-        fun = lambda min_time, compartment: derivatives( min_time = min_time, compartment = compartment, infusion_func = compartment_infusion_function,),
+        fun = lambda min_time, compartment: derivatives( min_time = min_time, compartment = compartment, u_ip = compartment_infusion_function,),
         t_span = (0.0, min_duration), 
         y0 = initial,
         t_eval = time_points, 
@@ -124,7 +124,7 @@ def perform_insulin_sim(
     return soln
 
 
-def plasma_insulin_concentration(
+def plasma_insulin_concentration(  #this is I_p
     plasma_mass: np.ndarray,
 ) -> np.ndarray:
     
